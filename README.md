@@ -8,6 +8,16 @@ API en FastAPI para gestionar una lista de tareas **con la voz**. El navegador g
 
 La intención la decide siempre el modelo de lenguaje. No hay reglas manuales del tipo `if "añade" in texto`.
 
+## Demo
+
+Grabación del flujo completo con el frontend de 4Geeks y el micrófono real (idioma: español). Se ve cómo se graba la orden de voz, la transcripción que devuelve el backend y la acción ejecutada sobre la lista de tareas.
+
+![Demo: órdenes de voz → transcripción → acción sobre las tareas](docs/demo/demo-voice-command-api.gif)
+
+**[Ver el vídeo en calidad completa (MP4, 25 MB)](docs/demo/demo-voice-command-api.mp4)**
+
+El registro detallado de todas las pruebas está en [PRUEBAS.md](PRUEBAS.md).
+
 ## Tecnologías
 
 - **Python 3.11+** (probado con 3.14) y **uv** para gestionar dependencias.

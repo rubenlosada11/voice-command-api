@@ -201,6 +201,8 @@ id title                 done
 
 Frontend de 4Geeks sin modificar (`npm ci` + `npm run dev`), en http://localhost:5173, con el idioma **Español**.
 
+**Vídeo de demostración:** [GIF](docs/demo/demo-voice-command-api.gif) · [MP4 en calidad completa](docs/demo/demo-voice-command-api.mp4). Es una sesión posterior a la de la tabla 6.1, con el código final, así que las tareas que aparecen son distintas.
+
 ### 6.1 Conversación completa mostrada por el frontend
 
 Copiada literalmente del chat de la web. **You** es la transcripción que devolvió el backend; **Final API response** es el `result`.
