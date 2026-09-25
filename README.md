@@ -1,207 +1,272 @@
-# Voice Command API at 4Geeks Academy
+# Voice Command API — Habla con tu lista de tareas
 
-<!-- hide -->
-
-By [@ehiber](https://github.com/ehiber) and [other contributors](https://github.com/4GeeksAcademy/voice-command-api/graphs/contributors) at [4Geeks Academy](https://4geeksacademy.com/)
-
-[![build by developers](https://img.shields.io/badge/build_by-Developers-blue)](https://4geeks.com)
-[![4Geeks Academy](https://img.shields.io/twitter/follow/4geeksacademy?style=social&logo=x)](https://x.com/4geeksacademy)
-
-_Estas instrucciones tambien estan disponibles en [espanol](./README.es.md)._
-
-**Before you start**: Read the [how to start a coding project](https://4geeks.com/lesson/how-to-start-a-project) guide before writing code.
-
-> We need you! These exercises are built and maintained in collaboration with people like you. If you find any bug 🐞 or typo, please contribute and/or report it.
-
-<!-- endhide -->
-
----
-
-## 🎯 Your challenge
-
-This repository is the starter template for the **Voice Command API** project.
-
-The frontend is already built. It records up to **20 seconds** of audio in the browser, sends that audio to your backend, and shows:
-
-- the transcription returned by the API
-- the final task response returned by the API
-
-Your job is to implement the backend so the full voice-to-action flow works end to end.
-
----
-
-## How the project works
-
-The frontend uses a single public entry point:
-
-- `POST /transcribe`
-
-The frontend does **not** resolve intents with the Web Speech API. It only captures audio (up to 20 seconds), sends the file to `POST /transcribe`, and shows the backend transcription to make debugging easier.
-
-That endpoint must:
-
-1. receive recorded audio from the frontend
-2. transcribe it to text
-3. reuse the same routing logic as `POST /instruction`
-4. execute the corresponding task action in memory
-5. return the transcription, the instruction payload, and the final result
-
-Your backend must also expose:
-
-- `POST /instruction`
-- `GET /tasks`
-- `POST /tasks`
-- `PUT /tasks/{task_id}`
-- `PATCH /tasks/{task_id}`
-- `DELETE /tasks/{task_id}`
-
-Important:
-
-- Use **in-memory storage only**. No database and no files.
-- The frontend is provided and should not be modified as part of the exercise.
-- The backend included in this repository is only a template. You must implement the missing logic.
-
----
-
-## Repository structure
+API en FastAPI para gestionar una lista de tareas **con la voz**. El navegador graba una orden como *"Añade comprar leche a mi lista"*. El backend la transcribe con **Whisper**, usa un **LLM** para decidir qué operación de la API corresponde, la ejecuta sobre la lista de tareas y devuelve el resultado.
 
 ```text
-voice-command-api/
-|-- .devcontainer/           # Codespaces setup
-|-- frontend/                # Ready-made frontend
-|   |-- public/
-|   `-- src/
-|-- src/
-|   `-- app/
-|       |-- api/routes/      # /transcribe, /instruction, /tasks
-|       |-- core/            # Settings and config
-|       |-- schemas/         # Request and response contracts
-|       |-- services/        # Your implementation goes here
-|       `-- utils/
-|-- pyproject.toml
-|-- README.md
-`-- README.es.md
+"Marca comprar leche como completada"  →  PATCH /tasks/1 {"done": true}  →  {"id": 1, "title": "Comprar leche", "done": true}
 ```
 
----
+La intención la decide siempre el modelo de lenguaje. No hay reglas manuales del tipo `if "añade" in texto`.
 
-## 🌱 How to start the project
+## Tecnologías
 
-You can open this project in [GitHub Codespaces](https://codespaces.new/4GeeksAcademy/voice-command-api) or clone it locally.
+- **Python 3.11+** (probado con 3.14) y **uv** para gestionar dependencias.
+- **FastAPI** y **Uvicorn** para la API HTTP.
+- **Pydantic** y **pydantic-settings** para validar datos y leer la configuración desde `.env`.
+- **Groq**, con el mismo cliente y la misma API key para:
+  - `whisper-large-v3-turbo`: transcripción de audio a texto;
+  - `openai/gpt-oss-20b`: conversión del texto en una instrucción JSON.
+- **pytest** para las pruebas automáticas.
 
-If you use Codespaces, the repository already includes a `.devcontainer` prepared for Python, Node, FastAPI, and Vite.
+## Instalación
 
-### Option A: GitHub Codespaces
-
-1. Open the repository in Codespaces.
-2. Wait for the dev container to finish installing dependencies.
-3. Create `.env` from `.env.example`.
-4. Create `frontend/.env` from `frontend/.env.example`.
-5. Run the backend and frontend from the terminal tabs.
-
-### Option B: Local setup
+Requisitos: Python 3.11 o superior, [uv](https://docs.astral.sh/uv/), Node.js 20.19 o superior (para el frontend) y una cuenta gratuita en [Groq](https://console.groq.com).
 
 ```bash
-git clone https://github.com/4GeeksAcademy/voice-command-api
+git clone https://github.com/rubenlosada11/voice-command-api.git
 cd voice-command-api
-```
-
-Create your own repository and update the remote:
-
-```bash
-git remote set-url origin https://github.com/YOUR_USERNAME/YOUR_REPOSITORY
-```
-
-### Backend setup
-
-Create a `.env` file from `.env.example` and fill in your Groq credentials.
-
-Install dependencies and run the API:
-
-```bash
 uv sync
+```
+
+`uv sync` crea el entorno virtual `.venv` e instala las versiones exactas fijadas en `uv.lock`, incluido pytest. Si quieres activar el entorno a mano:
+
+```powershell
+.venv\Scripts\Activate.ps1      # Windows (PowerShell)
+```
+
+```bash
+source .venv/bin/activate       # macOS / Linux
+```
+
+## Variables de entorno
+
+### Backend: `.env` en la raíz
+
+```bash
+cp .env.example .env            # PowerShell: Copy-Item .env.example .env
+```
+
+Edita `.env` y pon tu clave de Groq, que se crea en *console.groq.com → API Keys*:
+
+```text
+GROQ_API_KEY=tu_clave_de_groq
+GROQ_MODEL=openai/gpt-oss-20b
+GROQ_TRANSCRIPTION_MODEL=whisper-large-v3-turbo
+REQUEST_TIMEOUT_SECONDS=45
+ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+```
+
+| Variable | Obligatoria | Descripción |
+|---|---|---|
+| `GROQ_API_KEY` | Sí | Clave de Groq. La API no arranca sin ella. |
+| `GROQ_MODEL` | No | Modelo que convierte la orden en una instrucción. |
+| `GROQ_TRANSCRIPTION_MODEL` | No | Modelo de Whisper para la transcripción. |
+| `REQUEST_TIMEOUT_SECONDS` | No | Tiempo máximo de espera de cada llamada a Groq. |
+| `ALLOWED_ORIGINS` | No | Orígenes permitidos por CORS, separados por comas. |
+
+`.env` está en `.gitignore`. **La clave nunca debe subirse al repositorio.**
+
+### Frontend: `frontend/.env`
+
+```bash
+cp frontend/.env.example frontend/.env   # PowerShell: Copy-Item frontend\.env.example frontend\.env
+```
+
+Contiene `VITE_API_BASE_URL=http://127.0.0.1:8000`, la dirección del backend.
+
+## Ejecución
+
+Necesitas dos terminales.
+
+**Terminal 1, backend** (en la raíz del proyecto):
+
+```bash
 uv run uvicorn src.main:app --reload
 ```
 
-### Frontend setup
+- API: http://127.0.0.1:8000
+- Documentación interactiva: http://127.0.0.1:8000/docs
 
-Create `frontend/.env` from `frontend/.env.example`.
-
-Run the frontend:
+**Terminal 2, frontend:**
 
 ```bash
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
----
+Abre http://localhost:5173, elige el idioma, pulsa **Record** y concede permiso al micrófono.
 
-## 💻 What you need to do
+**Pruebas automáticas:**
 
-- [ ] Create a module-level `tasks` list with `id`, `title`, and `done`, using unique incremental IDs.
-- [ ] Implement `GET /tasks`, `POST /tasks`, `PUT /tasks/{task_id}`, `PATCH /tasks/{task_id}`, and `DELETE /tasks/{task_id}` using in-memory state.
-- [ ] Implement `POST /instruction` to receive `{ "transcription": "..." }`, call Groq, and return **only** routing JSON (no task execution):
+```bash
+uv run pytest
+```
+
+Las pruebas sustituyen Groq por un doble de pruebas: no hacen llamadas reales ni necesitan una clave válida.
+
+## Endpoints
+
+| Método | Ruta | Descripción | Respuesta correcta |
+|---|---|---|---|
+| `GET` | `/tasks` | Lista todas las tareas | 200 |
+| `POST` | `/tasks` | Crea una tarea (`title` obligatorio, `done` opcional) | 201 |
+| `PUT` | `/tasks/{task_id}` | Reemplaza una tarea (`title` y `done` obligatorios) | 200 |
+| `PATCH` | `/tasks/{task_id}` | Modifica `title` y/o `done` | 200 |
+| `DELETE` | `/tasks/{task_id}` | Elimina una tarea | 200 |
+| `POST` | `/instruction` | Convierte un texto en una instrucción **sin ejecutarla** | 200 |
+| `POST` | `/transcribe` | Audio o texto → instrucción → **la ejecuta** | 200 |
+| `GET` | `/` | Comprobación de estado (`{"status": "ok"}`) | 200 |
+
+### Errores
+
+| Código | Cuándo |
+|---|---|
+| 400 | Falta el archivo de audio, está vacío o el idioma no es válido |
+| 404 | La tarea no existe, también cuando la orden de voz menciona una tarea que no está en la lista |
+| 413 | El audio supera los 25 MB |
+| 415 | `Content-Type` o formato de audio no admitido en `/transcribe` |
+| 422 | Cuerpo inválido: falta `title`, está vacío, tipos incorrectos o no se detectó voz en el audio |
+| 502 | Groq no responde o el modelo devuelve una instrucción no válida |
+
+## Ejemplos
+
+Los ejemplos están sacados de pruebas reales. Tienes todas en [PRUEBAS.md](PRUEBAS.md).
+
+### CRUD
+
+```http
+POST /tasks
+{"title": "Comprar leche"}
+```
 
 ```json
-{
-  "endpoint": "/tasks",
-  "method": "POST",
-  "params": { "title": "Buy groceries" }
+201 {"id": 1, "title": "Comprar leche", "done": false}
+```
+
+```http
+PATCH /tasks/1
+{"done": true}
+```
+
+```json
+200 {"id": 1, "title": "Comprar leche", "done": true}
+```
+
+```http
+DELETE /tasks/1
+```
+
+```json
+200 {"message": "Task 1 deleted"}
+```
+
+### `POST /instruction`: solo devuelve la instrucción
+
+```http
+POST /instruction
+{"transcription": "marca comprar leche como completada"}
+```
+
+```json
+200 {"endpoint": "/tasks/1", "method": "PATCH", "params": {"done": true}}
+```
+
+La lista de tareas **no cambia**. Este endpoint solo indica qué habría que hacer.
+
+### `POST /transcribe`: audio (lo que envía el frontend)
+
+`multipart/form-data` con los campos `file` (webm, ogg, m4a, mp4, wav, mp3, mpeg, mpga o flac) y `language` (opcional, código ISO 639-1 como `es`; si se omite, Whisper detecta el idioma).
+
+```json
+200 {
+  "transcription": "Añade comprar leche a mi lista.",
+  "instruction": {"endpoint": "/tasks", "method": "POST", "params": {"title": "Comprar leche"}},
+  "result": {"id": 1, "title": "Comprar leche", "done": false}
 }
 ```
 
-- [ ] Implement `POST /transcribe` to accept `multipart/form-data`, convert audio to text, reuse `/instruction` logic, execute the selected action, and return `transcription`, `instruction`, and `result`.
-- [ ] Do not hardcode intent matching with manual rules such as `if "add" in text`.
+### `POST /transcribe`: texto (modo manual del frontend)
 
-⚠️ **IMPORTANT:** The frontend does not resolve intents with Web Speech API. It only captures audio (up to 20 seconds), sends it to `POST /transcribe`, and shows backend transcription to debug STT vs. routing issues.
+Si la grabación falla dos veces, el frontend permite escribir la orden. En ese caso envía JSON y se omite Whisper:
+
+```http
+POST /transcribe
+{"transcription": "elimina comprar leche"}
+```
 
 ```json
-{
-  "transcription": "add buy groceries to my list",
-  "instruction": {
-    "endpoint": "/tasks",
-    "method": "POST",
-    "params": {
-      "title": "Buy groceries"
-    }
-  },
-  "result": {
-    "id": 1,
-    "title": "Buy groceries",
-    "done": false
-  }
+200 {
+  "transcription": "elimina comprar leche",
+  "instruction": {"endpoint": "/tasks/3", "method": "DELETE", "params": {}},
+  "result": {"message": "Task 3 deleted"}
 }
 ```
 
----
+## Arquitectura
 
-## Debugging tip
+```text
+src/
+├── main.py                        # Punto de entrada: uvicorn src.main:app
+└── app/
+    ├── main.py                    # Crea la app, CORS y traducción de errores a HTTP
+    ├── core/config.py             # Configuración leída de .env
+    ├── schemas/voice.py           # Modelos Pydantic de entrada y salida
+    ├── utils/language.py          # Normaliza el idioma para Whisper
+    ├── api/routes/                # Solo HTTP: validan la entrada y llaman a los servicios
+    │   ├── tasks.py               #   CRUD /tasks
+    │   ├── instruction.py         #   POST /instruction
+    │   └── transcribe.py          #   POST /transcribe y GET /
+    └── services/                  # Lógica de la aplicación
+        ├── task_store.py          #   Lista `tasks` en memoria y operaciones CRUD
+        ├── groq_client.py         #   Cliente de Groq compartido
+        ├── speech_to_text.py      #   Audio → texto (Whisper)
+        ├── instruction_resolver.py#   Texto → instrucción JSON validada (LLM)
+        └── instruction_executor.py#   Ejecuta la instrucción sobre task_store
+tests/                             # Pruebas con pytest
+frontend/                          # Frontend proporcionado por 4Geeks
+```
 
-If the transcription shown in the frontend is already wrong, the problem is in the audio capture or speech-to-text step.
+### Almacenamiento en memoria
 
-If the transcription is correct but the action is wrong, the problem is in `/instruction`.
+Las tareas se guardan en una lista de Python (`tasks`) dentro del proceso: `{"id": 1, "title": "Comprar leche", "done": false}`.
 
----
+- **No hay base de datos ni archivos.** Las tareas se pierden al reiniciar el servidor.
+- Los IDs salen de un contador independiente. Un ID borrado **no se reutiliza** mientras el servidor siga en marcha.
 
-## ✅ What we will evaluate
+### Flujo de `POST /transcribe`
 
-- [ ] `POST /transcribe` accepts audio, transcribes it, and reuses `/instruction` routing logic.
-- [ ] `POST /instruction` receives plain text and returns only routing JSON (no action execution).
-- [ ] `GET /tasks`, `POST /tasks`, `PUT /tasks/{task_id}`, `PATCH /tasks/{task_id}`, and `DELETE /tasks/{task_id}` work correctly with in-memory state.
-- [ ] The frontend displays the transcription returned by the backend to help distinguish STT errors from routing errors.
+```text
+Navegador (MediaRecorder, máx. 20 s)
+  │  multipart: file + language        ── o JSON {transcription} en modo manual
+  ▼
+routes/transcribe.py      valida el formato, el tamaño y el idioma
+  ▼
+speech_to_text            Groq Whisper → texto          (se omite en modo manual)
+  ▼
+instruction_resolver      la misma función que POST /instruction:
+                          envía al LLM la orden y la lista actual de tareas (con sus IDs),
+                          en modo JSON, y valida la respuesta:
+                          · JSON con exactamente endpoint, method y params
+                          · method ∈ GET, POST, PUT, PATCH, DELETE
+                          · endpoint = /tasks o /tasks/{id numérico}
+                          · GET/POST solo sobre /tasks; PUT/PATCH/DELETE solo sobre /tasks/{id}
+  ▼
+instruction_executor      valida params con los mismos modelos que el CRUD
+                          y llama a la misma función de task_store
+  ▼
+{transcription, instruction, result}  →  frontend
+```
 
----
+Como el modelo recibe la lista actual de tareas, puede resolver una orden como *"marca comprar leche como completada"* con el ID real de la tarea. Si la tarea mencionada no existe, el modelo usa el id `0` y la API responde **404**.
 
-## 📦 How to submit this project
+Cada orden se traduce en **una sola** operación. En una orden compuesta como *"crea A, B y C"* solo se ejecuta la primera acción.
 
-1. Push your solution to your GitHub repository.
-2. Make sure backend and frontend are included and runnable locally.
-3. Share the repository URL and a short video/GIF showing:
-   - audio recording (20 seconds max),
-   - transcription visible in the frontend,
-   - correct task action execution.
+## Frontend
 
----
+El frontend (`frontend/`, en TypeScript con Vite) lo proporciona [4Geeks Academy](https://4geeksacademy.com/) como parte del ejercicio. **No forma parte de esta implementación y no se ha modificado.** El backend se ha adaptado a su contrato: solo llama a `POST /transcribe` y espera `{transcription, instruction, result}`.
 
-This and many other projects are built by students as part of the [Coding Bootcamps](https://4geeksacademy.com/) at 4Geeks Academy. Learn more about the [Full-Stack Software Developer](https://4geeksacademy.com/en/career-programs/full-stack), [Data Science & Machine Learning](https://4geeksacademy.com/en/career-programs/data-science-ml), [Cybersecurity](https://4geeksacademy.com/en/career-programs/cybersecurity), and [AI Engineering](https://4geeksacademy.com/en/career-programs/ai-engineering) programs.
+## Pruebas
+
+- **Automáticas:** `uv run pytest` ejecuta el almacén en memoria, el CRUD, CORS, `/instruction` y `/transcribe`.
+- **Manuales y reales:** con Groq, con audio y con el navegador. Detalladas en [PRUEBAS.md](PRUEBAS.md).

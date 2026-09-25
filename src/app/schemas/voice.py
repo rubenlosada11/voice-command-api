@@ -1,20 +1,22 @@
-from typing import Any
+from typing import Annotated, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
+
+NonBlankStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class TaskCreate(BaseModel):
-    title: str = Field(..., min_length=1)
+    title: NonBlankStr
     done: bool = False
 
 
 class TaskReplace(BaseModel):
-    title: str = Field(..., min_length=1)
+    title: NonBlankStr
     done: bool
 
 
 class TaskUpdate(BaseModel):
-    title: str | None = Field(default=None, min_length=1)
+    title: NonBlankStr | None = None
     done: bool | None = None
 
 
@@ -25,7 +27,7 @@ class Task(BaseModel):
 
 
 class InstructionRequest(BaseModel):
-    transcription: str = Field(..., min_length=1)
+    transcription: NonBlankStr
 
 
 class InstructionPayload(BaseModel):
